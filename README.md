@@ -1,2 +1,2 @@
-# practical_optimisation_coureswork
-4M17 Practical optimisation coursework 2: find optimum of 5D Schwefel's function
+4M17 Coursework 2: 
+Find global minimum of 5D Schwefel's function using simulated annealing and a genetic algorithm + compare performance.
