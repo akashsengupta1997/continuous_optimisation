@@ -10,7 +10,7 @@ class SimpleAnnealer:
 
         # Max allowed change in each control variable for simple soln generator
         # TODO mess with sizes of diagonals
-        self.C = np.identity(num_control_vars)
+        self.C = 10*np.identity(num_control_vars)
 
     def soln_generator(self, current_soln):
         """
@@ -22,7 +22,7 @@ class SimpleAnnealer:
         :param current_soln:
         :return:
         """
-        u = np.random.uniform(-1.0, 1.0, (self.num_control_vars, 1))
+        u = np.random.uniform(-1.0, 1.0, self.num_control_vars)
         valid_solution = False
         while not valid_solution:
             new_soln = current_soln + np.dot(self.C, u)
@@ -41,26 +41,31 @@ class SimpleAnnealer:
 
     def simulated_annealing(self):
 
-        current_soln = [0, 0]
+        current_soln = [300, 300]  # TODO randomise initial solution
         current_fval = self.objective_func(current_soln)
         best_soln = current_soln
         best_fval = current_fval
-        temperature = 10
+        temperature = 1000  # TODO initial search for temperature
+        soln_store = []
 
-        for i in range(1000):
+        for i in range(10000):
             new_soln = self.soln_generator(current_soln)
             new_fval = self.objective_func(new_soln)
             accept_prob = self.acceptance_probability(current_fval, new_fval, temperature)
 
             if accept_prob > np.random.rand():
-                current_soln = new_soln
+                current_soln = new_soln.copy()
                 current_fval = new_fval
+                soln_store.append(current_soln)
 
-                if current_soln < best_soln:
+                if current_fval < best_fval:
                     best_soln = current_soln.copy()
                     best_fval = current_fval
 
             temperature = 0.95*temperature
+            # print(new_fval)
+
+        return best_soln, best_fval, soln_store
 
 
 
