@@ -49,3 +49,8 @@ def search_pattern_contour_plot(objective_func, solns):
     plt.contour(xx, yy, z, 10)
 
     plt.show()
+
+
+def fvals_iters_plot(fvals):
+    plt.plot(fvals)
+    plt.show()

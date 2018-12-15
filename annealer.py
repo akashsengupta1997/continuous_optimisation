@@ -10,10 +10,9 @@ class SimpleAnnealer:
         self.initial_temperature_search_evals = 700
 
         # Max allowed change in each control variable for simple soln generator
-        # TODO mess with sizes of diagonals
-        self.C = 250*np.identity(num_control_vars)
-        # Temperature multiplier
-        self.alpha = 0.95
+        self.C = 200*np.identity(num_control_vars)
+        self.alpha = 0.95  # Temperature decrement multiplier
+        self.chain_length = 10  # Number of iterations at each temperature
 
     def soln_generator(self, current_soln):
         """
@@ -74,29 +73,38 @@ class SimpleAnnealer:
         best_soln = current_soln
         best_fval = current_fval
         temperature = self.initial_temperature_search(0.8)
-        soln_store = []
+        solns = []
+        fvals = []
+        num_trials_current_temperature = 0
+        num_acceptances_current_temperature = 0
 
         for i in range(self.allowed_evals - self.initial_temperature_search_evals - 1):
             # need -1 here because doing 1 function evaluation outside the loop
             new_soln = self.soln_generator(current_soln)
             new_fval = self.objective_func(new_soln)
             accept_prob = self.acceptance_probability(current_fval, new_fval, temperature)
+            num_trials_current_temperature += 1
 
             if accept_prob > np.random.rand():
                 current_soln = new_soln.copy()
                 current_fval = new_fval
-                soln_store.append(current_soln)
+                solns.append(current_soln)
+                fvals.append(current_fval)
+                num_acceptances_current_temperature += 1
 
                 if current_fval < best_fval:
                     best_soln = current_soln.copy()
                     best_fval = current_fval
 
+            # Adjust temperature if passed self.chain_length trials at current temperature or
+            # if self.chain_length*0.6 acceptances have occurred at current temperature
+            if num_trials_current_temperature > self.chain_length or \
+                    num_acceptances_current_temperature > self.chain_length * 0.6:
+                temperature = self.alpha * temperature
+                num_trials_current_temperature = 0
+                num_acceptances_current_temperature = 0
 
-            
-
-            temperature = self.alpha * temperature
-
-        return best_soln, best_fval, soln_store
+        return best_soln, best_fval, solns, fvals
 
 
 
