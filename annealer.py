@@ -2,15 +2,6 @@ import numpy as np
 import math
 import time
 
-# TODO write scripts to tune params for each annealer implemention
-# do 50 runs at param value, avg best fval, then change param value and repeat
-# params: C, chain_length, alpha
-
-# TODO try tuning with larger chain lengths
-
-# TODO write testing code - do 50 runs, collect fvals, calculate std of runs, report best fval
-# when writing testing code, use i = 1,...,50 as random seed for each iter
-
 
 class Annealer:
     """
@@ -29,6 +20,7 @@ class Annealer:
         self.allowed_evals = 10000
         self.initial_temperature_search_evals = 500
 
+        # --- Varying implementations ---
         self.adaptive_solns = adaptive_solns
         self.adaptive_schedule = adaptive_schedule
 
@@ -125,28 +117,6 @@ class Annealer:
                 acceptance_prob = math.exp(- delta_f / (temperature * step_size))
             else:
                 acceptance_prob = math.exp(- delta_f / temperature)
-            return acceptance_prob
-
-    def adaptive_acceptance_probability(self, current_f_val, new_fval, current_soln, new_soln,
-                                        temperature):
-        """
-        Calculates probability of new solution being accepted when using the adaptive solution
-        generator.
-        :param current_f_val: function value at current_soln
-        :param new_fval: function value at new_soln
-        :param current_soln
-        :param new_soln
-        :param temperature
-        :return: acceptance probability
-        """
-        delta_f = new_fval - current_f_val
-
-        if delta_f < 0:
-            return 1
-        else:
-            step_size = np.linalg.norm(new_soln - current_soln)
-            print(step_size)
-            acceptance_prob = math.exp(- delta_f / (temperature*step_size))
             return acceptance_prob
 
     def initial_temperature_search(self, initial_acceptance_prob):
