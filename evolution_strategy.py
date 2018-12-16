@@ -20,9 +20,10 @@ class EvolutionStrategy:
         population = []
         for i in range(self.num_children):
             control_vars = 500*np.random.uniform(-1.0, 1.0, self.num_control_vars)
-            stds = np.random.randn(self.num_control_vars)**2
-            cov_matrix = np.diag(variances)
-            population.append([control_vars, cov_matrix])
+            stds = np.sqrt(np.random.randn(self.num_control_vars)**2)
+            temp = np.random.randn(self.num_control_vars, self.num_control_vars)
+            rot_angles = (temp - temp.T)/2  # skew-symmetric with diagonals = 0
+            population.append([control_vars, stds, rot_angles])
 
         return population
 
@@ -72,44 +73,52 @@ class EvolutionStrategy:
 
         return cov_matrix
 
-    def mutate_stratetgy_params(self, population):
+    def mutate_stratetgy_params(self, solution):
         tau = 1/math.sqrt(2*math.sqrt(self.num_control_vars))
         tau_prime = 1/math.sqrt(2*self.num_control_vars)
         beta = 0.0873
-        for i in range(len(population)):
-            chi_0 = np.random.randn()
-            chi_i = np.random.randn(self.num_control_vars)
-            chi_ij = np.random.randn(self.num_control_vars, self.num_control_vars)
 
-            cov_matrix = population[i][1]
-            stds = np.sqrt(np.diag(cov_matrix))
-            new_stds = np.multiply(stds, np.exp(tau_prime * chi_0 + tau * chi_i))
+        chi_0 = np.random.randn()
+        chi_i = np.random.randn(self.num_control_vars)
+        temp = np.random.randn(self.num_control_vars, self.num_control_vars)
+        chi_ij = (temp - temp.T)/2  # skew-symmetric
 
-            # For rotation angle matrices, only off-diagonal terms are relevant
-            rot_angles = self.cov_matrix_to_rotation_angles(cov_matrix)
+        stds = solution[1]
+        new_stds = np.multiply(stds, np.exp(tau_prime * chi_0 + tau * chi_i))
+
+        # For rotation angle matrices, only off-diagonal terms are relevant
+        rot_angles = solution[2]
+        new_rot_angles = rot_angles + beta * chi_ij
+
+        return new_stds, new_rot_angles
+
+    def mutate_solutions(self, population):
+
+        for m in range(len(population)):
+            new_stds, new_rot_angles = self.mutate_stratetgy_params(population[m])
+            # print(new_stds)
+            # print(new_rot_angles)
+            # Cov_matrix should be symmetric since rot_angles matrix is skew-symmetric
+            cov_matrix = np.zeros((self.num_control_vars, self.num_control_vars))
+            for i in range(self.num_control_vars):
+                for j in range(self.num_control_vars):
+                    if i == j:
+                        cov_matrix[i, j] = new_stds[i]**2
+                    else:
+                        cov_matrix[i, j] = 0.5*(new_stds[i]**2-new_stds[j]**2)*np.tan(2*new_rot_angles[i, j])
+
             print(cov_matrix)
-            print(rot_angles)
-            new_rot_angles = rot_angles + beta * chi_ij
-            print(new_rot_angles)
-            new_cov_matrix = self.rotation_angles_to_cov_matrix(new_rot_angles, new_stds) + np.diag(new_stds**2)
             # print(np.all(np.linalg.eigvals(cov_matrix) > 0))
-            # print(np.all(np.linalg.eigvals(new_cov_matrix) > 0))
-            # print(new_cov_matrix)
-            # print(np.linalg.eigvals(new_cov_matrix))
-
-
-
-    def mutate_control_variables(self, population):
-        pass
+            # print(np.linalg.eigvals(cov_matrix))
 
     def recombine(self):
         pass
 
 
-test = EvolutionStrategy(schwefel_func, 3)
+test = EvolutionStrategy(schwefel_func, 5)
 pop = test.generate_intial_population()
-# # print(test.select_parents(pop, None))
-# test.mutate_stratetgy_params(pop)
-
-cov_matrix = np.array([[3, 4, 7], [4, 3, -1], [7, -1, 8]])
-print(test.cov_matrix_to_rotation_angles(cov_matrix))
+# print(test.select_parents(pop, None))
+test.mutate_solutions(pop)
+#
+# cov_matrix = np.array([[3, 4, 7], [4, 3, -1], [7, -1, 8]])
+# print(test.cov_matrix_to_rotation_angles(cov_matrix))
