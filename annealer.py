@@ -85,10 +85,11 @@ class Annealer:
         Uses Eqn 7 from SA handout: D_new = (1-alpha)D_old + alpha * omega * R
         :param u: vector of step size multipliers, needed to compute R
         """
-        damping = 0.1
+        damping = 0.1  # using recommended values
         weighting = 2.1
         R = np.diag(np.absolute(np.dot(self.D, u)))
         self.D = (1 - damping) * self.D + damping * weighting * R
+        self.D[self.D > 100] = 100  # upper limit on values of elements of D
         # print('accepted', R)
         # print('sanity check', np.linalg.norm(R.diagonal()))
         # print(self.D)
@@ -99,12 +100,15 @@ class Annealer:
         """
         return 500*np.random.uniform(-1.0, 1.0, self.num_control_vars)
 
-    def acceptance_probability(self, current_f_val, new_fval, temperature):
+    def acceptance_probability(self, current_f_val, new_fval, current_soln, new_soln,
+                               temperature):
         """
-        Calculates probability of new solution being accepted when using the simple solution
-        generator.
-        :param current_f_val: function value at current solution
-        :param new_fval: function value at new solution
+        Calculates probability of new solution being accepted - different equation used when
+        using the simple solution generator vs adaptive solution generator.
+        :param current_f_val: function value at current_soln
+        :param new_fval: function value at new_soln
+        :param current_soln
+        :param new_soln
         :param temperature
         :return: acceptance probability
         """
@@ -113,7 +117,11 @@ class Annealer:
         if delta_f < 0:
             return 1
         else:
-            acceptance_prob = math.exp(- delta_f / temperature)
+            if self.adaptive_solns:
+                step_size = np.linalg.norm(new_soln - current_soln)
+                acceptance_prob = math.exp(- delta_f / (temperature * step_size))
+            else:
+                acceptance_prob = math.exp(- delta_f / temperature)
             return acceptance_prob
 
     def adaptive_acceptance_probability(self, current_f_val, new_fval, current_soln, new_soln,
@@ -134,6 +142,7 @@ class Annealer:
             return 1
         else:
             step_size = np.linalg.norm(new_soln - current_soln)
+            print(step_size)
             acceptance_prob = math.exp(- delta_f / (temperature*step_size))
             return acceptance_prob
 
@@ -141,6 +150,9 @@ class Annealer:
         """
         Search to determine initial temperature such that solutions which increase
         the objective function value are accepted with probability = initial_acceptance_prob.
+        This effectively involves rearranging the acceptance probability equation to get
+        initial temperature - hence, a different formulation is implemented if the adaptive
+        solution generator is used.
         :param initial_acceptance_prob
         :return: initial temperature
         """
@@ -153,8 +165,14 @@ class Annealer:
             new_soln = self.soln_generator(current_soln)
             new_fval = self.objective_func(current_soln)
             delta_f = new_fval - current_fval
+
             if delta_f > 0:
-                fval_increases.append(delta_f)
+                if self.adaptive_solns:
+                    step_size = np.linalg.norm(new_soln - current_soln)
+                    fval_increases.append(delta_f/step_size)
+                else:
+                    fval_increases.append(delta_f)
+
             current_soln = new_soln.copy()
             current_fval = new_fval
 
@@ -205,7 +223,7 @@ class Annealer:
         best_soln = current_soln
         best_fval = current_fval
         temperature = self.initial_temperature_search(0.8)
-        # print('initial temperature', temperature)
+        print('initial temperature', temperature)
         solns = []
         fvals = []
         accepted_fvals_at_current_temp = []
@@ -218,38 +236,25 @@ class Annealer:
 
             if self.adaptive_solns:
                 new_soln, u = self.adaptive_soln_generator(current_soln)
-                new_fval = self.objective_func(new_soln)
-                accept_prob = self.adaptive_acceptance_probability(current_fval, new_fval,
-                                                                   current_soln, new_soln,
-                                                                   temperature)
-                num_trials_current_temperature += 1
-
-                if accept_prob > np.random.rand():
-                    current_soln = new_soln.copy()
-                    current_fval = new_fval
-                    self.update_adaptive_max_steps(u)
-                    solns.append(current_soln)  # Update history of all ACCEPTED solutions
-                    accepted_fvals_at_current_temp.append(current_fval)
-
-                    if current_fval < best_fval:
-                        best_soln = current_soln.copy()
-                        best_fval = current_fval
-
             else:
                 new_soln = self.soln_generator(current_soln)
-                new_fval = self.objective_func(new_soln)
-                accept_prob = self.acceptance_probability(current_fval, new_fval, temperature)
-                num_trials_current_temperature += 1
 
-                if accept_prob > np.random.rand():
-                    current_soln = new_soln.copy()
-                    current_fval = new_fval
-                    solns.append(current_soln)
-                    accepted_fvals_at_current_temp.append(current_fval)
+            new_fval = self.objective_func(new_soln)
+            accept_prob = self.acceptance_probability(current_fval, new_fval, current_soln,
+                                                          new_soln, temperature)
+            num_trials_current_temperature += 1
 
-                    if current_fval < best_fval:
-                        best_soln = current_soln.copy()
-                        best_fval = current_fval
+            if accept_prob > np.random.rand():
+                current_soln = new_soln.copy()
+                current_fval = new_fval
+                if self.adaptive_solns:
+                    self.update_adaptive_max_steps(u)
+                solns.append(current_soln)  # Update history of all ACCEPTED solutions
+                accepted_fvals_at_current_temp.append(current_fval)
+
+                if current_fval < best_fval:
+                    best_soln = current_soln.copy()
+                    best_fval = current_fval
 
             # Update history of function value at each iteration and cumulative runtime at
             # each iteration
