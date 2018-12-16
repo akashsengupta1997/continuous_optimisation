@@ -40,16 +40,13 @@ class Annealer:
         self.C = 50 * np.identity(num_control_vars)
         # Initial max allowed change in each control variable for adaptive solution generator
         self.D = 50 * np.identity(num_control_vars)
-
-        self.alpha = 0.96  # Temperature multiplier for simple annealing schedule
-        if self.adaptive_schedule and self.adaptive_solns:
-            pass
-        elif self.adaptive_schedule:
-            self.chain_length = 800  # Number of iterations at each temperature
-        elif self.adaptive_solns:
-            self.chain_length = 120  # Number of iterations at each temperature
+        # Temperature multiplier for simple annealing schedule
+        self.alpha = 0.96
+        # Number of iterations at each temperature
+        if self.adaptive_schedule:
+            self.chain_length = 700
         else:
-            self.chain_length = 100  # Number of iterations at each temperature
+            self.chain_length = 110
 
     def soln_generator(self, current_soln):
         """
@@ -95,7 +92,7 @@ class Annealer:
         weighting = 2.1
         R = np.diag(np.absolute(np.dot(self.D, u)))
         self.D = (1 - damping) * self.D + damping * weighting * R
-        # self.D[self.D > 100] = 100  # upper limit on values of elements of D
+        self.D[self.D > 60] = 60  # upper limit on values of elements of D
         # print('accepted', R)
         # print('sanity check', np.linalg.norm(R.diagonal()))
         # print(self.D)
