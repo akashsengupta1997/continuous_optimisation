@@ -6,6 +6,8 @@ import time
 # do 50 runs at param value, avg best fval, then change param value and repeat
 # params: C, chain_length, alpha
 
+# TODO try tuning with larger chain lengths
+
 # TODO write testing code - do 50 runs, collect fvals, calculate std of runs, report best fval
 # when writing testing code, use i = 1,...,50 as random seed for each iter
 
@@ -39,11 +41,11 @@ class Annealer:
         # Initial max allowed change in each control variable for adaptive solution generator
         self.D = 50 * np.identity(num_control_vars)
 
-        self.alpha = 0.96
+        self.alpha = 0.96  # Temperature multiplier for simple annealing schedule
         if self.adaptive_schedule and self.adaptive_solns:
             pass
         elif self.adaptive_schedule:
-            pass
+            self.chain_length = 800  # Number of iterations at each temperature
         elif self.adaptive_solns:
             self.chain_length = 120  # Number of iterations at each temperature
         else:
