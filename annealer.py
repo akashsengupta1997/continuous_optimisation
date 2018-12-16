@@ -6,7 +6,8 @@ import time
 # do 50 runs at param value, avg best fval, then change param value and repeat
 # params: C, chain_length, alpha
 
-# TODO check adaptive temperature decrementer
+# TODO write testing code - do 50 runs, collect fvals, calculate std of runs, report best fval
+# when writing testing code, use i = 1,...,50 as random seed for each iter
 
 
 class Annealer:
@@ -36,13 +37,16 @@ class Annealer:
         # Max allowed change in each control variable for simple solution generator
         self.C = 50 * np.identity(num_control_vars)
         # Initial max allowed change in each control variable for adaptive solution generator
-        self.D = 70 * np.identity(num_control_vars)
+        self.D = 50 * np.identity(num_control_vars)
 
-        if self.adaptive_solns:
-            self.alpha = 0.95  # Temperature decrement multiplier for simple annealing schedule
-            self.chain_length = 70  # Number of iterations at each temperature
+        self.alpha = 0.96
+        if self.adaptive_schedule and self.adaptive_solns:
+            pass
+        elif self.adaptive_schedule:
+            pass
+        elif self.adaptive_solns:
+            self.chain_length = 120  # Number of iterations at each temperature
         else:
-            self.alpha = 0.95  # Temperature decrement multiplier for simple annealing schedule
             self.chain_length = 100  # Number of iterations at each temperature
 
     def soln_generator(self, current_soln):
@@ -89,7 +93,7 @@ class Annealer:
         weighting = 2.1
         R = np.diag(np.absolute(np.dot(self.D, u)))
         self.D = (1 - damping) * self.D + damping * weighting * R
-        self.D[self.D > 100] = 100  # upper limit on values of elements of D
+        # self.D[self.D > 100] = 100  # upper limit on values of elements of D
         # print('accepted', R)
         # print('sanity check', np.linalg.norm(R.diagonal()))
         # print(self.D)
@@ -177,8 +181,6 @@ class Annealer:
             current_fval = new_fval
 
         initial_temperature = - np.mean(fval_increases) / math.log(initial_acceptance_prob)
-        # print('mean fval increase', np.mean(fval_increases))
-        # print('T0', initial_temperature)
         return initial_temperature
 
     def adaptive_temperature_decrementer(self, current_temperature, fvals_at_current_temp):
@@ -223,7 +225,7 @@ class Annealer:
         best_soln = current_soln
         best_fval = current_fval
         temperature = self.initial_temperature_search(0.8)
-        print('initial temperature', temperature)
+        # print('initial temperature', temperature)
         solns = []
         fvals = []
         accepted_fvals_at_current_temp = []
@@ -270,12 +272,11 @@ class Annealer:
                 if self.adaptive_schedule:
                     temperature = self.adaptive_temperature_decrementer(temperature,
                                                                         accepted_fvals_at_current_temp)
-                    num_trials_current_temperature = 0
-                    accepted_fvals_at_current_temp = []
                 else:
                     temperature = self.alpha * temperature
-                    num_trials_current_temperature = 0
-                    accepted_fvals_at_current_temp = []
+
+                num_trials_current_temperature = 0
+                accepted_fvals_at_current_temp = []
 
         return best_soln, best_fval, solns, fvals, iter_times
 
