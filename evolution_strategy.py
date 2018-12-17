@@ -47,6 +47,7 @@ class EvolutionStrategy:
             control_vars = solution[0]
             if np.any(control_vars > 500):
                 population.remove(solution)
+        # Using map is a little bit faster than appending in for loop
         fvals = list(map(self.objective_func, [solution[0] for solution in population]))
         sorted_indices = np.argsort(fvals)
         parents = []
