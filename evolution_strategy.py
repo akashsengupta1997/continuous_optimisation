@@ -15,7 +15,7 @@ class EvolutionStrategy:
 
         self.objective_func = objective_func
         self.num_control_vars = num_control_vars
-        self.allowed_evals = 10000
+        self.allowed_evals = 1000
 
         self.elitist = elitist
         self.global_recombination = global_recombination
@@ -41,39 +41,48 @@ class EvolutionStrategy:
         else:
             population = children
 
-        # Check that all control variables within bounds - don't select solutions with invalid
-        # control variables
-        for solution in population:
-            control_vars = solution[0]
+        # Check that all control variables within bounds - remove solutions with invalid
+        # control variables from population
+        for i in range(len(population)):
+            print(i)
+            control_vars = population[i][0]
             if np.any(control_vars > 500):
-                population.remove(solution)
+                population.pop(i)
+        # TODO fix this can't use pop because indexes change after popping
+        # REMOVE INVALID INDICES FROM SORTED_INDICES LIST
+
+        # Assess population
         # Using map is a little bit faster than appending in for loop
         fvals = list(map(self.objective_func, [solution[0] for solution in population]))
         sorted_indices = np.argsort(fvals)
+
+        # Select top num_parents solutions as new parents
         parents = []
         for i in range(self.num_parents):
             parents.append(children[sorted_indices[i]])
 
-        return parents
+        num_func_evals = len(fvals)
 
-    def cov_matrix_to_rotation_angles(self, covariance_matrix):
-        rot_angles = np.zeros((self.num_control_vars, self.num_control_vars))
-        for i in range(self.num_control_vars):
-            for j in range(self.num_control_vars):
-                if i != j:
-                    # Only want to calculate for off-diagonal elements
-                    # Need to check that var_i != var_j or else will get divide by 0 errors
-                    # if var_i == var_j, arctan function should return pi/2 or -pi/2
-                    # Edge case when c_ij = 0 and var_i = var_j: get 0/0 in arctan - in this
-                    # case, I am just assigning alpha_ij = 0
-                    if covariance_matrix[i, j] == 0:
-                        rot_angles[i, j] = 0
-                    elif covariance_matrix[i, i] == covariance_matrix[j, j]:
-                        rot_angles[i, j] = 0.5*math.copysign(1, covariance_matrix[i, j])*np.pi/2
-                    else:
-                        rot_angles[i, j] = 0.5*np.arctan(2*covariance_matrix[i, j]/(covariance_matrix[i, i] - covariance_matrix[j, j]))
+        return parents, num_func_evals
 
-        return rot_angles
+    # def cov_matrix_to_rotation_angles(self, covariance_matrix):
+    #     rot_angles = np.zeros((self.num_control_vars, self.num_control_vars))
+    #     for i in range(self.num_control_vars):
+    #         for j in range(self.num_control_vars):
+    #             if i != j:
+    #                 # Only want to calculate for off-diagonal elements
+    #                 # Need to check that var_i != var_j or else will get divide by 0 errors
+    #                 # if var_i == var_j, arctan function should return pi/2 or -pi/2
+    #                 # Edge case when c_ij = 0 and var_i = var_j: get 0/0 in arctan - in this
+    #                 # case, I am just assigning alpha_ij = 0
+    #                 if covariance_matrix[i, j] == 0:
+    #                     rot_angles[i, j] = 0
+    #                 elif covariance_matrix[i, i] == covariance_matrix[j, j]:
+    #                     rot_angles[i, j] = 0.5*math.copysign(1, covariance_matrix[i, j])*np.pi/2
+    #                 else:
+    #                     rot_angles[i, j] = 0.5*np.arctan(2*covariance_matrix[i, j]/(covariance_matrix[i, i] - covariance_matrix[j, j]))
+    #
+    #     return rot_angles
 
     def construct_cov_matrix(self, rotation_angles, stds):
         """
@@ -155,14 +164,13 @@ class EvolutionStrategy:
         :param parent_strategy_params: strategy params of 2 randomly sampled parents
         :return:
         """
-        child_strategy_params = [None, None]
-        # Intermediate recombination
-        child_strategy_params[0] = self.recombination_weight*parent_1[0] + \
+        # Intermediate recombination of stds and rotation angles
+        child_stds = self.recombination_weight*parent_1[0] + \
             (1-self.recombination_weight)*parent_2[0]
-        child_strategy_params[1] = self.recombination_weight*parent_1[1] + \
+        child_rot_angles = self.recombination_weight*parent_1[1] + \
             (1-self.recombination_weight)*parent_2[1]
 
-        return child_strategy_params
+        return child_stds, child_rot_angles
 
     def recombination(self, parents):
         children = []
@@ -175,25 +183,51 @@ class EvolutionStrategy:
                 parent_2 = 0
                 while parent_1 == parent_2:
                     (parent_1, parent_2) = np.random.randint(0, self.num_parents, size=2)
+
                 # Discrete recombination of control variables
                 child_control_vars = self.control_var_recombination(parents[parent_1][0],
                                                                     parents[parent_2][0])
-                child_strat_params = self.strategy_params_recombination(parents[parent_1][1:],
-                                                                        parents[parent_2][1:])
-                # print('parent 1', parents[parent_1])
-                # print('parent 2', parents[parent_2])
-                # print('child', [child_control_vars, child_strat_params])
-                children.append([child_control_vars, child_strat_params])
+                child_stds, child_rot_angles = self.strategy_params_recombination(
+                    parents[parent_1][1:], parents[parent_2][1:])
+                children.append([child_control_vars, child_stds, child_rot_angles])
 
         return children
 
+    def optimise(self):
+        children = self.generate_intial_population()
+        # store control variable settings in each generation
+        children_control_vars_history = [[child[0] for child in children]]
+        previous_parents = None
+        total_func_evals = 0
+
+        while total_func_evals < self.allowed_evals:
+            parents, num_func_evals = self.select_parents(children, previous_parents)
+            total_func_evals += num_func_evals
+            # print("PARENTS")
+            # print(parents)
+            mutated_parents = self.mutate_solutions(parents)
+            children = self.recombination(mutated_parents)
+            previous_parents = mutated_parents.copy()
+            # print("CHILDREN")
+            # print(children)
+            children_control_vars_history.append([child[0] for child in children])
+
+        final_children_fvals = list(map(self.objective_func, [soln[0] for soln in children]))
+        # TODO get best final fval and solution and return
+
+        return children_control_vars_history
 
 
 test = EvolutionStrategy(schwefel_func, 5)
-pop = test.generate_intial_population()
-parents = test.select_parents(pop, None)
-parents = test.mutate_solutions(parents)
-new_pop = test.recombination(parents)
+# pop = test.generate_intial_population()
+# parents, _ = test.select_parents(pop, None)
+# parents = test.mutate_solutions(parents)
+# new_pop = test.recombination(parents)
+
+history = test.optimise()
+print(history)
+print(len(history))
+print(len(history[0]))
 
 #
 # cov_matrix = np.array([[3, 4, 7], [4, 3, -1], [7, -1, 8]])
