@@ -3,7 +3,8 @@ import math
 import time
 from objective import schwefel_func
 
-# TODO implement global recombination
+# TODO write evaluation code
+# TODO write
 
 
 class EvolutionStrategy:
@@ -12,12 +13,12 @@ class EvolutionStrategy:
 
         self.objective_func = objective_func
         self.num_control_vars = num_control_vars
-        self.allowed_evals = 5000
+        self.allowed_evals = 2000  # Don't need all 10000 allowed evaluations
 
         self.elitist = elitist
         self.global_recombination = global_recombination
 
-        self.num_parents = 10
+        self.num_parents = 50
         self.num_children = self.num_parents * 7
         self.recombination_weight = 0.5
 
@@ -44,18 +45,19 @@ class EvolutionStrategy:
         else:
             population = children
 
-        # Check that all control variables within bounds - remove solutions with invalid
-        # control variables from population
+        # Check that all control variables within bounds - store the population indices of
+        # invalid solutions, for later removal from population
         invalid_indices = []
         for i in range(len(population)):
             control_vars = population[i][0]
-            if np.any(control_vars > 500):
+            if np.any(control_vars > 500) or np.any(control_vars < -500):
                 invalid_indices.append(i)
 
         # Assess population
         # Using map is a little bit faster than appending in for loop
         fvals = list(map(self.objective_func, [solution[0] for solution in population]))
         sorted_indices = np.argsort(fvals)
+
         # Remove invalid indices from sorted_indices list
         for index in invalid_indices:
             sorted_indices = list(sorted_indices)
@@ -104,10 +106,6 @@ class EvolutionStrategy:
         # For rotation angle matrices, only off-diagonal terms are relevant
         rot_angles = solution[2]
         new_rot_angles = rot_angles + beta * chi_ij
-        # print(rot_angles)
-        # print(new_rot_angles)
-        # print(np.absolute(rot_angles)>np.pi)
-        # print(np.absolute(new_rot_angles)>np.pi)
 
         return new_stds, new_rot_angles
 
@@ -214,6 +212,8 @@ class EvolutionStrategy:
         children_fvals_history = []
         previous_parents = None
         total_func_evals = 0
+        best_fval = np.inf
+        best_control_vars = None
         generation_times = []
         start = time.time()
 
@@ -223,6 +223,18 @@ class EvolutionStrategy:
                                                                           previous_parents)
             total_func_evals += num_func_evals
             children_fvals_history.append(children_fvals)
+
+            # If best child solution found in this generation, save it.
+            # Note that children CAN have control variable values outside [-500, 500], although
+            # it is ensured that these invalid children are not selected to be parents.
+            # Need to check to ensure that best child solution is a valid solution.
+            # parents list is sorted - parents[0] is solution with lowest objective value.
+            best_generation_fval = self.objective_func(parents[0][0])
+            if best_generation_fval < best_fval:
+                if np.all(parents[0][0] < 500) \
+                        and np.all(parents[0][0] > -500):
+                    best_fval = best_generation_fval
+                    best_control_vars = parents[0][0]
 
             # Mutate parents
             mutated_parents = self.mutate_solutions(parents)
@@ -235,12 +247,20 @@ class EvolutionStrategy:
             # Recording times
             generation_times.append(time.time() - start)
 
-        # Final assessment outside the loop (can change code so don't have to do this?)
-        final_children_fvals = list(map(self.objective_func, [soln[0] for soln in children]))
+        # Final assessment outside the loop - note: not same structure as Fig 1 in ES handout
+        final_parents, _, final_children_fvals = self.select_parents(children,
+                                                                     previous_parents)
         children_fvals_history.append(final_children_fvals)
+        best_final_fval = self.objective_func(final_parents[0][0])
+        if best_final_fval < best_fval:
+            if np.all(final_parents[0][0] < 500) \
+                    and np.all(final_parents[0][0] > -500):
+                best_fval = best_final_fval
+                best_control_vars = final_parents[0][0]
         generation_times.append(time.time() - start)
 
-        return children_control_vars_history, children_fvals_history, generation_times
+        return best_control_vars, best_fval, \
+               children_control_vars_history, children_fvals_history, generation_times
 
 #
 # test = EvolutionStrategy(schwefel_func, 5)
