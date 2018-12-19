@@ -25,20 +25,33 @@ class Annealer:
         self.adaptive_schedule = adaptive_schedule
 
         # --- Hyperparamters ---
-        # Hyperparameter values were tuned using a grid search for each possible configuration
-        # of simple and adaptive implementations
 
         # Max allowed change in each control variable for simple solution generator
-        self.C = 50 * np.identity(num_control_vars)
+        # self.C = 70 * np.identity(num_control_vars)
+        self.C = 0.1 * np.identity(num_control_vars)
+
         # Initial max allowed change in each control variable for adaptive solution generator
-        self.D = 50 * np.identity(num_control_vars)
+        # self.D = 70 * np.identity(num_control_vars)
+        self.D = np.identity(num_control_vars)
+
         # Temperature multiplier for simple annealing schedule
-        self.alpha = 0.96
+        self.alpha = 0.97
+
         # Number of iterations at each temperature
-        if self.adaptive_schedule:
-            self.chain_length = 700
-        else:
-            self.chain_length = 110
+        self.chain_length = 110
+
+        # Hyperparameter values were tuned using a grid search for each possible configuration
+        # of simple and adaptive implementations
+        if self.adaptive_schedule and self.adaptive_solns:
+            self.D = 0.09 * np.identity(num_control_vars)
+            self.chain_length = 950
+        elif self.adaptive_solns:
+            self.D = 0.11 * np.identity(num_control_vars)
+            self.alpha = 0.96
+            self.chain_length = 120
+        elif self.adaptive_schedule:
+            self.chain_length = 935
+            self.C = 0.12 * np.identity(num_control_vars)
 
     def soln_generator(self, current_soln):
         """
@@ -54,7 +67,9 @@ class Annealer:
         while not valid_solution:
             u = np.random.uniform(-1.0, 1.0, self.num_control_vars)
             new_soln = current_soln + np.dot(self.C, u)
-            if np.all(new_soln <= 500) and np.all(new_soln >= -500):
+            # if np.all(new_soln <= 500) and np.all(new_soln >= -500):
+            if np.all(new_soln <= 1) and np.all(new_soln >= -1):
+
                 valid_solution = True
         return new_soln
 
@@ -69,7 +84,8 @@ class Annealer:
         while not valid_solution:
             u = np.random.uniform(-1.0, 1.0, self.num_control_vars)
             new_soln = current_soln + np.dot(self.D, u)
-            if np.all(new_soln <= 500) and np.all(new_soln >= -500):
+            # if np.all(new_soln <= 500) and np.all(new_soln >= -500):
+            if np.all(new_soln <= 1) and np.all(new_soln >= -1):
                 valid_solution = True
         return new_soln, u
 
@@ -84,7 +100,7 @@ class Annealer:
         weighting = 2.1
         R = np.diag(np.absolute(np.dot(self.D, u)))
         self.D = (1 - damping) * self.D + damping * weighting * R
-        self.D[self.D > 60] = 60  # upper limit on values of elements of D
+        # self.D[self.D > 60] = 60  # upper limit on values of elements of D
         # print('accepted', R)
         # print('sanity check', np.linalg.norm(R.diagonal()))
         # print(self.D)
@@ -93,7 +109,8 @@ class Annealer:
         """
         :return: valid random setting of control variables.
         """
-        return 500*np.random.uniform(-1.0, 1.0, self.num_control_vars)
+        # return 500*np.random.uniform(-1.0, 1.0, self.num_control_vars)
+        return np.random.uniform(-1.0, 1.0, self.num_control_vars)
 
     def acceptance_probability(self, current_f_val, new_fval, current_soln, new_soln,
                                temperature):
@@ -125,18 +142,19 @@ class Annealer:
         the objective function value are accepted with probability = initial_acceptance_prob.
         This effectively involves rearranging the acceptance probability equation to get
         initial temperature - hence, a different formulation is implemented if the adaptive
-        solution generator is used.
+        solution generator is used, since then delta_f/step_size is the relevant value rather
+        just delta_f.
         :param initial_acceptance_prob
         :return: initial temperature
         """
         current_soln = self.random_soln_generator()
-        current_fval = self.objective_func(current_soln)
+        current_fval = self.objective_func(current_soln*500)
         fval_increases = []
 
         for i in range(self.initial_temperature_search_evals - 1):
             # need -1 here because doing 1 function evaluation outside the loop
             new_soln = self.soln_generator(current_soln)
-            new_fval = self.objective_func(current_soln)
+            new_fval = self.objective_func(current_soln*500)
             delta_f = new_fval - current_fval
 
             if delta_f > 0:
@@ -162,7 +180,7 @@ class Annealer:
         """
         # If too few function values are accepted at the current temperature, don't have an
         # accurate estimate of the standard deviation - only use this decrementer if > 15
-        # values accepted.
+        # values accepted. # TODO CHANGE to > 1
         if len(fvals_at_current_temp) > 15:
             std = np.std(fvals_at_current_temp)
             alpha = max(math.exp(-0.7*current_temperature / std), 0.5)
@@ -190,7 +208,7 @@ class Annealer:
         # current_soln = [0, 0, 0, 0, 0]
         # current_soln = [0, 0]
         # print('init soln', current_soln)
-        current_fval = self.objective_func(current_soln)
+        current_fval = self.objective_func(500*current_soln)
         best_soln = current_soln
         best_fval = current_fval
         temperature = self.initial_temperature_search(0.8)
@@ -210,7 +228,7 @@ class Annealer:
             else:
                 new_soln = self.soln_generator(current_soln)
 
-            new_fval = self.objective_func(new_soln)
+            new_fval = self.objective_func(500*new_soln)
             accept_prob = self.acceptance_probability(current_fval, new_fval, current_soln,
                                                           new_soln, temperature)
             num_trials_current_temperature += 1
@@ -220,7 +238,7 @@ class Annealer:
                 current_fval = new_fval
                 if self.adaptive_solns:
                     self.update_adaptive_max_steps(u)
-                solns.append(current_soln)  # Update history of all ACCEPTED solutions
+                solns.append(500*current_soln)  # Update history of all ACCEPTED solutions
                 accepted_fvals_at_current_temp.append(current_fval)
 
                 if current_fval < best_fval:
@@ -247,7 +265,7 @@ class Annealer:
                 num_trials_current_temperature = 0
                 accepted_fvals_at_current_temp = []
 
-        return best_soln, best_fval, solns, fvals, iter_times
+        return 500*best_soln, best_fval, solns, fvals, iter_times
 
 
 

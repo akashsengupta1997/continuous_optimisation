@@ -2,6 +2,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
+from objective import schwefel_func
 
 # TODO LABELS
 
@@ -17,13 +18,15 @@ def surface_plot(objective_func):
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    ax.plot_surface(xx, yy, z, cmap=cm.coolwarm)
+    ax.plot_surface(xx, yy, z, cmap=cm.coolwarm, label='2D-SF')
+    ax.set_xlabel("x1")
+    ax.set_ylabel("x2")
     plt.show()
 
 
 def contour_plot(objective_func):
-    x = np.arange(-500, 500, 1)
-    y = np.arange(-500, 500, 1)
+    x = np.arange(-500, 500, 5)
+    y = np.arange(-500, 500, 5)
     xx, yy = np.meshgrid(x, y, sparse=False)
     z = np.zeros((len(x), len(y)))
     for i in range(len(x)):
@@ -32,12 +35,15 @@ def contour_plot(objective_func):
 
     # plt.figure()
     plt.contour(xx, yy, z, 10)
+    plt.xlabel('x1')
+    plt.ylabel('x2')
     plt.show()
 
+contour_plot(schwefel_func)
 
 def search_pattern_contour_plot(objective_func, solns):
-    x = np.arange(-500, 500, 1)
-    y = np.arange(-500, 500, 1)
+    x = np.arange(-500, 500, 5)
+    y = np.arange(-500, 500, 5)
     xx, yy = np.meshgrid(x, y, sparse=False)
     z = np.zeros((len(x), len(y)))
     for i in range(len(x)):
@@ -108,3 +114,4 @@ def evolution_strat_search_pattern_contour_plot(objective_func, children_history
         plt.scatter(x1s, x2s, facecolors='none', edgecolors='r')
 
         plt.show()
+
