@@ -1,12 +1,8 @@
 import numpy as np
 import math
 import time
-from objective import schwefel_func
 
-# TODO write evaluation code
-# TODO write
-
-
+# TODO check PD code, check sizes of rot angles
 class EvolutionStrategy:
     def __init__(self, objective_func, num_control_vars, elitist=False,
                  global_recombination=False):
@@ -18,7 +14,7 @@ class EvolutionStrategy:
         self.elitist = elitist
         self.global_recombination = global_recombination
 
-        self.num_parents = 50
+        self.num_parents = 5 # 50
         self.num_children = self.num_parents * 7
         self.recombination_weight = 0.5
 
@@ -228,7 +224,7 @@ class EvolutionStrategy:
             # Note that children CAN have control variable values outside [-500, 500], although
             # it is ensured that these invalid children are not selected to be parents.
             # Need to check to ensure that best child solution is a valid solution.
-            # parents list is sorted - parents[0] is solution with lowest objective value.
+            # parents list is sorted - parents[0] is best child solution in this generation.
             best_generation_fval = self.objective_func(parents[0][0])
             if best_generation_fval < best_fval:
                 if np.all(parents[0][0] < 500) \

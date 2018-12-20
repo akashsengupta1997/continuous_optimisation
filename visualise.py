@@ -39,7 +39,6 @@ def contour_plot(objective_func):
     plt.ylabel('x2')
     plt.show()
 
-contour_plot(schwefel_func)
 
 def search_pattern_contour_plot(objective_func, solns):
     x = np.arange(-500, 500, 5)
@@ -55,17 +54,23 @@ def search_pattern_contour_plot(objective_func, solns):
 
     plt.scatter(x1s, x2s, facecolors='none', edgecolors='r')
     plt.contour(xx, yy, z, 10)
+    plt.xlabel('x1')
+    plt.ylabel('x2')
 
     plt.show()
 
 
 def fvals_iters_plot(fvals):
     plt.plot(fvals)
+    plt.xlabel('Iteration')
+    plt.ylabel('Objective value')
     plt.show()
 
 
 def fvals_times_plot(fvals, times):
     plt.plot(times, fvals)
+    plt.xlabel('Runtime (s)')
+    plt.ylabel('Objective value')
     plt.show()
 
 

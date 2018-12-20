@@ -28,11 +28,11 @@ class Annealer:
 
         # Max allowed change in each control variable for simple solution generator
         # self.C = 70 * np.identity(num_control_vars)
-        self.C = 0.1 * np.identity(num_control_vars)
+        self.C = 0.11 * np.identity(num_control_vars)
 
         # Initial max allowed change in each control variable for adaptive solution generator
         # self.D = 70 * np.identity(num_control_vars)
-        self.D = np.identity(num_control_vars)
+        self.D = None
 
         # Temperature multiplier for simple annealing schedule
         self.alpha = 0.97
@@ -43,14 +43,14 @@ class Annealer:
         # Hyperparameter values were tuned using a grid search for each possible configuration
         # of simple and adaptive implementations
         if self.adaptive_schedule and self.adaptive_solns:
-            self.D = 0.09 * np.identity(num_control_vars)
-            self.chain_length = 950
+            self.D = 0.16 * np.identity(num_control_vars)
+            self.chain_length = 1420
         elif self.adaptive_solns:
-            self.D = 0.11 * np.identity(num_control_vars)
+            self.D = 0.09 * np.identity(num_control_vars)
             self.alpha = 0.96
             self.chain_length = 120
         elif self.adaptive_schedule:
-            self.chain_length = 935
+            self.chain_length = 1300
             self.C = 0.12 * np.identity(num_control_vars)
 
     def soln_generator(self, current_soln):
@@ -100,10 +100,8 @@ class Annealer:
         weighting = 2.1
         R = np.diag(np.absolute(np.dot(self.D, u)))
         self.D = (1 - damping) * self.D + damping * weighting * R
-        # self.D[self.D > 60] = 60  # upper limit on values of elements of D
-        # print('accepted', R)
-        # print('sanity check', np.linalg.norm(R.diagonal()))
-        # print(self.D)
+        self.D[self.D > 1] = 1  # upper limit on values of elements of D
+        self.D[self.D < -1] = -1  # lower limit on values of elements of D
 
     def random_soln_generator(self):
         """
@@ -204,10 +202,6 @@ class Annealer:
         """
 
         current_soln = self.random_soln_generator()
-        # current_soln = [420, 420, 420, 420, 420]
-        # current_soln = [0, 0, 0, 0, 0]
-        # current_soln = [0, 0]
-        # print('init soln', current_soln)
         current_fval = self.objective_func(500*current_soln)
         best_soln = current_soln
         best_fval = current_fval

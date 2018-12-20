@@ -8,9 +8,9 @@ def optimiser_test(optimiser):
     min_fvals = []
     min_solns = []
     for i in range(100):
-        np.random.seed(i)
+        np.random.seed(i**2)
         if isinstance(optimiser, Annealer):
-            min_soln, min_fval, _, _, _ = optimiser.simulated_annealing()
+            min_soln, min_fval, _, _, times = optimiser.simulated_annealing()
         elif isinstance(optimiser, EvolutionStrategy):
             min_soln, min_fval, _, _, _ = optimiser.optimise()
         min_fvals.append(min_fval)
@@ -24,21 +24,21 @@ def optimiser_test(optimiser):
     return best_fval, best_soln, avg_fval, std_fval
 
 
-simple_annealer = Annealer(schwefel_func, 5)
-adaptive_soln_annealer = Annealer(schwefel_func, 5, adaptive_solns=True)
-adaptive_temp_annealer = Annealer(schwefel_func, 5, adaptive_schedule=True)
-double_adaptive_annealer = Annealer(schwefel_func, 5, adaptive_schedule=True,
-                                     adaptive_solns=True)
-
-print(optimiser_test(simple_annealer))
-print(optimiser_test(adaptive_soln_annealer))
-print(optimiser_test(adaptive_temp_annealer))
-print(optimiser_test(double_adaptive_annealer))
-
-# es = EvolutionStrategy(schwefel_func, 5)
-# es_elitist = EvolutionStrategy(schwefel_func, 5, elitist=True)
-# es_global = EvolutionStrategy(schwefel_func, 5, global_recombination=True)
+# simple_annealer = Annealer(schwefel_func, 5)
+# adaptive_soln_annealer = Annealer(schwefel_func, 5, adaptive_solns=True)
+# adaptive_temp_annealer = Annealer(schwefel_func, 5, adaptive_schedule=True)
+# double_adaptive_annealer = Annealer(schwefel_func, 5, adaptive_schedule=True,
+#                                     adaptive_solns=True)
 #
-# print(optimiser_test(es))
-# print(optimiser_test(es_elitist))
-# print(optimiser_test(es_global))
+# print(optimiser_test(simple_annealer))
+# print(optimiser_test(adaptive_soln_annealer))
+# print(optimiser_test(adaptive_temp_annealer))
+# print(optimiser_test(double_adaptive_annealer))
+
+es = EvolutionStrategy(schwefel_func, 5)
+es_elitist = EvolutionStrategy(schwefel_func, 5, elitist=True)
+es_global = EvolutionStrategy(schwefel_func, 5, global_recombination=True)
+
+print(optimiser_test(es))
+print(optimiser_test(es_elitist))
+print(optimiser_test(es_global))
