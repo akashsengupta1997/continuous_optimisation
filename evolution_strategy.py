@@ -2,39 +2,57 @@ import numpy as np
 import math
 import time
 
-# TODO check PD code, check sizes of rot angles
+# TODO check PD code, check sizes of rot angles CHECK INITIALISATION OF STD
 class EvolutionStrategy:
     def __init__(self, objective_func, num_control_vars, elitist=False,
-                 global_recombination=False):
+                 full_discrete_recombination=False, global_recombination=False):
 
         self.objective_func = objective_func
         self.num_control_vars = num_control_vars
         self.allowed_evals = 2000  # Don't need all 10000 allowed evaluations
 
         self.elitist = elitist
+        self.full_discrete_recombination = full_discrete_recombination
         self.global_recombination = global_recombination
 
-        self.num_parents = 5 # 50
+        self.num_parents = 40  # 50
         self.num_children = self.num_parents * 7
         self.recombination_weight = 0.5
 
     def generate_intial_population(self):
+        """
+        Generate an initial population with num_children solutions.
+
+        Solutions are represented as a tuple with 3 elements. The first element is a
+        5-dimensional vector representing the control variables. The second element is
+        a 5-dimensional vector representing variances/step sizes. The third element,
+        representing 10 rotation angles, is a 5-by-5 skew-symmetric matrix
+        with all diagonal elements equal to 0.
+
+        The population is then a list of tuples.
+
+        :return: initial population.
+        """
         population = []
         for i in range(self.num_children):
             control_vars = 500*np.random.uniform(-1.0, 1.0, self.num_control_vars)
-            stds = np.sqrt(np.random.randn(self.num_control_vars)**2)
-            temp = np.random.randn(self.num_control_vars, self.num_control_vars)
-            rot_angles = (temp - temp.T)/2  # skew-symmetric with diagonals = 0
+            # stds = np.sqrt(np.random.randn(self.num_control_vars)**2)
+            # temp = np.random.randn(self.num_control_vars, self.num_control_vars)
+            # rot_angles = (temp - temp.T)/2  # skew-symmetric with diagonals = 0
+            # Choosing small initial values ensures that
+            stds = 0.01*np.ones(self.num_control_vars)
+            rot_angles = np.zeros((self.num_control_vars, self.num_control_vars))
             population.append([control_vars, stds, rot_angles])
 
         return population
 
     def select_parents(self, children, previous_parents):
         """
-
-        :param children:
-        :param previous_parents:
-        :return:
+        Deterministically select parents from children or from children + previous parents,
+        depending on whether self.elitist is true or not.
+        :param children: list of solutions (tuples)
+        :param previous_parents: list of solutions (tuples)
+        :return: parents
         """
         if self.elitist and previous_parents is not None:
             population = children + previous_parents
@@ -71,9 +89,11 @@ class EvolutionStrategy:
 
     def construct_cov_matrix(self, rotation_angles, stds):
         """
-        Diagonals are incorrect - actual diagonals are stds.
-        :param rotation_angles:
-        :return:
+        Construct a PSD covariance matrix from rotation angles and standard deviations (for a
+        single solution).
+        :param rotation_angles
+        :param stds
+        :return: covariance matrix
         """
         cov_matrix = np.zeros((self.num_control_vars, self.num_control_vars))
         for i in range(self.num_control_vars):
@@ -84,6 +104,16 @@ class EvolutionStrategy:
                     cov_matrix[i, j] = 0.5 * (stds[i] ** 2 - stds[j] ** 2) * np.tan(
                         2 * rotation_angles[i, j])
 
+        # Ensure that covariance matrix is positive definite by adding eI till all
+        # eigenvalues > 0
+        i = 0
+        epsilon = 0.1
+        while not np.all(np.linalg.eigvals(cov_matrix) > 0):
+            cov_matrix = cov_matrix + epsilon*np.identity(self.num_control_vars)
+            i = i + 1
+            if i > 30:
+                epsilon = 1
+        # if i > 30: print(i)
         return cov_matrix
 
     def mutate_stratetgy_params(self, solution):
@@ -93,8 +123,9 @@ class EvolutionStrategy:
 
         chi_0 = np.random.randn()
         chi_i = np.random.randn(self.num_control_vars)
-        temp = np.random.randn(self.num_control_vars, self.num_control_vars)
+        temp = np.sqrt(2)*np.random.randn(self.num_control_vars, self.num_control_vars)
         chi_ij = (temp - temp.T)/2  # skew-symmetric
+        # multiplying temp by sqrt(2) to make chi_ij ~ N(0,1)
 
         stds = solution[1]
         new_stds = np.multiply(stds, np.exp(tau_prime * chi_0 + tau * chi_i))
@@ -123,7 +154,7 @@ class EvolutionStrategy:
             mutated_population.append([new_control_vars, new_stds, new_rot_angles])
         return mutated_population
 
-    def control_var_recombination(self, parent_control_vars1, parent_control_vars2):
+    def control_var_discrete_recombination(self, parent_control_vars1, parent_control_vars2):
         """
 
         :param parent_control_vars: control varaibles of 2 randomly sampled parents
@@ -158,7 +189,7 @@ class EvolutionStrategy:
 
         return np.array(child_control_vars), np.array(child_stds), child_rot_angle
 
-    def strategy_params_recombination(self, parent_strat_params1, parent_strat_params2):
+    def strategy_params_intermediate_recombination(self, parent_strat_params1, parent_strat_params2):
         """
 
         :param parent_strategy_params: strategy params of 2 randomly sampled parents
@@ -170,6 +201,17 @@ class EvolutionStrategy:
         child_rot_angles = self.recombination_weight * parent_strat_params1[1] + \
                            (1-self.recombination_weight) * parent_strat_params2[1]
 
+        return child_stds, child_rot_angles
+
+    def strategy_params_discrete_recombination(self, parent_strat_params1, parent_strat_params2):
+        std_cross_points = np.random.rand(self.num_control_vars) < 0.5  # p(cross) = 0.5 (fair coin toss)
+        child_stds = np.where(std_cross_points, parent_strat_params1[0], parent_strat_params2[0])
+
+        temp = np.random.rand(self.num_control_vars, self.num_control_vars)
+        temp = (temp + temp.T) / 2
+        rot_angle_cross_points = temp < 0.5
+        child_rot_angles = np.where(rot_angle_cross_points, parent_strat_params1[1],
+                                    parent_strat_params2[1])
         return child_stds, child_rot_angles
 
     def recombination(self, parents):
@@ -187,12 +229,18 @@ class EvolutionStrategy:
                     (parent_1, parent_2) = np.random.randint(0, self.num_parents, size=2)
 
                 # Discrete recombination of control variables
-                child_control_vars = self.control_var_recombination(parents[parent_1][0],
-                                                                    parents[parent_2][0])
-                # Intermediate recombination of strategy params
-                child_stds, child_rot_angles = self.strategy_params_recombination(
-                    parents[parent_1][1:], parents[parent_2][1:])
-                children.append([child_control_vars, child_stds, child_rot_angles])
+                child_control_vars = self.control_var_discrete_recombination(parents[parent_1][0],
+                                                                             parents[parent_2][0])
+                if self.full_discrete_recombination:
+                    # Discrete recombination of strategy params
+                    child_stds, child_rot_angles = self.strategy_params_discrete_recombination(
+                        parents[parent_1][1:], parents[parent_2][1:])
+                    children.append([child_control_vars, child_stds, child_rot_angles])
+                else:
+                    # Intermediate recombination of strategy params
+                    child_stds, child_rot_angles = self.strategy_params_intermediate_recombination(
+                        parents[parent_1][1:], parents[parent_2][1:])
+                    children.append([child_control_vars, child_stds, child_rot_angles])
 
         return children
 
@@ -226,6 +274,7 @@ class EvolutionStrategy:
             # Need to check to ensure that best child solution is a valid solution.
             # parents list is sorted - parents[0] is best child solution in this generation.
             best_generation_fval = self.objective_func(parents[0][0])
+            total_func_evals += 1
             if best_generation_fval < best_fval:
                 if np.all(parents[0][0] < 500) \
                         and np.all(parents[0][0] > -500):
@@ -258,23 +307,3 @@ class EvolutionStrategy:
         return best_control_vars, best_fval, \
                children_control_vars_history, children_fvals_history, generation_times
 
-#
-# test = EvolutionStrategy(schwefel_func, 5)
-# pop = test.generate_intial_population()
-# parents, _, _ = test.select_parents(pop, None)
-# test.global_recombination(parents)
-
-# # parents = test.mutate_solutions(parents)
-# # new_pop = test.recombination(parents)
-#
-# control_vars_history, fvals_history = test.optimise()
-# print(control_vars_history)
-# print(len(control_vars_history))
-# print(len(control_vars_history[0]))
-# print(fvals_history)
-# print(len(fvals_history))
-# print(len(fvals_history[0]))
-
-#
-# cov_matrix = np.array([[3, 4, 7], [4, 3, -1], [7, -1, 8]])
-# print(test.cov_matrix_to_rotation_angles(cov_matrix))

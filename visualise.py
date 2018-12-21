@@ -117,6 +117,9 @@ def evolution_strat_search_pattern_contour_plot(objective_func, children_history
 
         plt.contour(xx, yy, z, 10)
         plt.scatter(x1s, x2s, facecolors='none', edgecolors='r')
+        plt.xlabel('x1')
+        plt.ylabel('x2')
+        plt.title('Generation %d' % generation)
 
         plt.show()
 
