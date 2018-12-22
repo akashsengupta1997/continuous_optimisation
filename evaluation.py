@@ -5,11 +5,19 @@ from objective import schwefel_func
 
 
 def optimiser_test(optimiser):
+    """
+    Function to test the best performance, average performance, consistency and computational
+    runtime of given optimiser.
+    :param optimiser: instance of Annealer class or EvolutionStrategy class
+    :return: best objective found in 100 runs and corresponding solution, average optimal
+    objective over 100 runs, standard deviation of optimal objectives over 100 runs, average
+    runtime over 100 runs.
+    """
     min_fvals = []
     min_solns = []
     run_times = []
     for i in range(100):
-        # np.random.seed(i)
+        np.random.seed(i)
         if isinstance(optimiser, Annealer):
             min_soln, min_fval, _, _, times = optimiser.simulated_annealing()
         elif isinstance(optimiser, EvolutionStrategy):

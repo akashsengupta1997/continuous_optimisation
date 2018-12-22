@@ -2,11 +2,23 @@ import numpy as np
 import math
 import time
 
-# TODO check PD code, check sizes of rot angles CHECK INITIALISATION OF STD
+
 class EvolutionStrategy:
+    """
+    Contains all methods for evolutionary strategy optimisation.
+    """
     def __init__(self, objective_func, num_control_vars, elitist=False,
                  full_discrete_recombination=False, global_recombination=False):
+        """
 
+        :param objective_func: function to minimise
+        :param num_control_vars: number of control variables
+        :param elitist: bool, use elitist selection if true
+        :param full_discrete_recombination: bool, use local-discrete recombination on both
+        control variables and strategy parameters if true.
+        :param global_recombination: bool, use global-discrete recombination on both control
+        variables and strategy parameters if true.
+        """
         self.objective_func = objective_func
         self.num_control_vars = num_control_vars
         self.allowed_evals = 2000  # Don't need all 10000 allowed evaluations
@@ -15,9 +27,9 @@ class EvolutionStrategy:
         self.full_discrete_recombination = full_discrete_recombination
         self.global_recombination = global_recombination
 
-        self.num_parents = 40  # 50
+        self.num_parents = 55
         self.num_children = self.num_parents * 7
-        self.recombination_weight = 0.5
+        self.recombination_weight = 0.5  # weight for intermediate recombination
 
     def generate_intial_population(self):
         """
@@ -36,10 +48,7 @@ class EvolutionStrategy:
         population = []
         for i in range(self.num_children):
             control_vars = 500*np.random.uniform(-1.0, 1.0, self.num_control_vars)
-            # stds = np.sqrt(np.random.randn(self.num_control_vars)**2)
-            # temp = np.random.randn(self.num_control_vars, self.num_control_vars)
-            # rot_angles = (temp - temp.T)/2  # skew-symmetric with diagonals = 0
-            # Choosing small initial values ensures that
+            # Choose small initial values to get PSD covariance matrix post-mutation
             stds = 0.01*np.ones(self.num_control_vars)
             rot_angles = np.zeros((self.num_control_vars, self.num_control_vars))
             population.append([control_vars, stds, rot_angles])
@@ -113,10 +122,15 @@ class EvolutionStrategy:
             i = i + 1
             if i > 30:
                 epsilon = 1
-        # if i > 30: print(i)
         return cov_matrix
 
     def mutate_stratetgy_params(self, solution):
+        """
+        Mutate strategy parameters using Eqns 3 and 4 from ES handout.
+        :param solution: tuple, solution[1] and solution[2] are the stds and rot_angles to be
+        mutated
+        :return: mutated stds and rot_angles
+        """
         tau = 1/math.sqrt(2*math.sqrt(self.num_control_vars))
         tau_prime = 1/math.sqrt(2*self.num_control_vars)
         beta = 0.0873
@@ -138,7 +152,8 @@ class EvolutionStrategy:
 
     def mutate_solutions(self, parents):
         """
-        Mutate parents before recombination.
+        Mutate parents before recombination. First mutate strategy params, then mutate control
+        variables (Eqns 3, 4, 5, 6 from ES handout).
         :param parents:
         :return:
         """
@@ -156,9 +171,12 @@ class EvolutionStrategy:
 
     def control_var_discrete_recombination(self, parent_control_vars1, parent_control_vars2):
         """
-
-        :param parent_control_vars: control varaibles of 2 randomly sampled parents
-        :return:
+        Discrete recombination of control variables.
+        :param parent_control_vars1: control variables of 1 of the 2 randomly sampled parents
+        i.e. list
+        :param parent_control_vars2: control variables of 1 of the 2 randomly sampled parents
+        i.e. list
+        :return: child control variables (list)
         """
         # Discrete recombination
         cross_points = np.random.rand(self.num_control_vars) < 0.5  # p(cross) = 0.5 (fair coin toss)
@@ -166,7 +184,12 @@ class EvolutionStrategy:
 
         return child_control_vars
 
-    def global_recombinator(self, parents):
+    def global_discrete_recombination(self, parents):
+        """
+        Global discrete recombination of control variables and strategy parameters.
+        :param parents: All num_parents parent from this generation, i.e. list of tuples.
+        :return: child solution (tuple)
+        """
         child_control_vars = []
         child_stds = []
         child_rot_angle = np.zeros((self.num_control_vars, self.num_control_vars))
@@ -189,11 +212,15 @@ class EvolutionStrategy:
 
         return np.array(child_control_vars), np.array(child_stds), child_rot_angle
 
-    def strategy_params_intermediate_recombination(self, parent_strat_params1, parent_strat_params2):
+    def strategy_params_intermediate_recombination(self, parent_strat_params1,
+                                                   parent_strat_params2):
         """
-
-        :param parent_strategy_params: strategy params of 2 randomly sampled parents
-        :return:
+        Intermediate recombination of strategy parameters.
+        :param parent_strat_params1: strategy params of 1 of 2 randomly sampled parents
+        (tuple of list and matrix)
+        :param parent_strat_params2: strategy params of 1 of 2 randomly sampled parents
+        (tuple of list and matrix)
+        :return: child strategy params (tuple of list and matrix)
         """
         # Intermediate recombination of stds and rotation angles
         child_stds = self.recombination_weight * parent_strat_params1[0] + \
@@ -203,7 +230,16 @@ class EvolutionStrategy:
 
         return child_stds, child_rot_angles
 
-    def strategy_params_discrete_recombination(self, parent_strat_params1, parent_strat_params2):
+    def strategy_params_discrete_recombination(self, parent_strat_params1,
+                                               parent_strat_params2):
+        """
+        Discrete recombination of strategy parameters.
+        :param parent_strat_params1:strategy params of 1 of 2 randomly sampled parents
+        (tuple of list and matrix)
+        :param parent_strat_params2: strategy params of 1 of 2 randomly sampled parents
+        (tuple of list and matrix)
+        :return: child strategy params (tuple of list and matrix)
+        """
         std_cross_points = np.random.rand(self.num_control_vars) < 0.5  # p(cross) = 0.5 (fair coin toss)
         child_stds = np.where(std_cross_points, parent_strat_params1[0], parent_strat_params2[0])
 
@@ -215,11 +251,19 @@ class EvolutionStrategy:
         return child_stds, child_rot_angles
 
     def recombination(self, parents):
+        """
+        Recombination between parents. Default recombination configuration is discrete
+        recombination on control variables and intermediate recombination on strategy
+        parameters.
+        :param parents: list of tuples, each representing a single parent solution.
+        :return: children, list of tuples, each representing a single solution,
+        len = self.num_children
+        """
         children = []
         for i in range(self.num_children):
             if self.global_recombination:
                 # Global discrete recombination of all solution components
-                child_control_vars, child_stds, child_rot_angles = self.global_recombinator(parents)
+                child_control_vars, child_stds, child_rot_angles = self.global_discrete_recombination(parents)
                 children.append([child_control_vars, child_stds, child_rot_angles])
             else:
                 # Randomly sample 2 parents
@@ -246,8 +290,10 @@ class EvolutionStrategy:
 
     def optimise(self):
         """
-
-        :return:
+        Perform evolutionary strategy algorithm.
+        :return: best setting of control variables, best function value, history of control
+        variable solutions in each generation, history of fvals in each generation, computation
+        time for each generation.
         """
         children = self.generate_intial_population()
         # Store all control variable settings for each generation in history list
@@ -262,7 +308,7 @@ class EvolutionStrategy:
         start = time.time()
 
         while total_func_evals < self.allowed_evals:
-            # Assess population and selection parents
+            # Assess population and select parents
             parents, num_func_evals, children_fvals = self.select_parents(children,
                                                                           previous_parents)
             total_func_evals += num_func_evals

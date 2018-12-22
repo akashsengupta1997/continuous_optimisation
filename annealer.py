@@ -27,11 +27,9 @@ class Annealer:
         # --- Hyperparamters ---
 
         # Max allowed change in each control variable for simple solution generator
-        # self.C = 70 * np.identity(num_control_vars)
         self.C = 0.11 * np.identity(num_control_vars)
 
         # Initial max allowed change in each control variable for adaptive solution generator
-        # self.D = 70 * np.identity(num_control_vars)
         self.D = None
 
         # Temperature multiplier for simple annealing schedule
@@ -84,7 +82,6 @@ class Annealer:
         while not valid_solution:
             u = np.random.uniform(-1.0, 1.0, self.num_control_vars)
             new_soln = current_soln + np.dot(self.D, u)
-            # if np.all(new_soln <= 500) and np.all(new_soln >= -500):
             if np.all(new_soln <= 1) and np.all(new_soln >= -1):
                 valid_solution = True
         return new_soln, u
@@ -107,7 +104,6 @@ class Annealer:
         """
         :return: valid random setting of control variables.
         """
-        # return 500*np.random.uniform(-1.0, 1.0, self.num_control_vars)
         return np.random.uniform(-1.0, 1.0, self.num_control_vars)
 
     def acceptance_probability(self, current_f_val, new_fval, current_soln, new_soln,
@@ -176,10 +172,7 @@ class Annealer:
         :param fvals_at_current_temp: objective function values accept at current temperature.
         :return: new temperature
         """
-        # If too few function values are accepted at the current temperature, don't have an
-        # accurate estimate of the standard deviation - only use this decrementer if > 15
-        # values accepted. # TODO CHANGE to > 1
-        if len(fvals_at_current_temp) > 15:
+        if len(fvals_at_current_temp) > 1:
             std = np.std(fvals_at_current_temp)
             alpha = max(math.exp(-0.7*current_temperature / std), 0.5)
             return alpha * current_temperature
@@ -200,13 +193,12 @@ class Annealer:
         values).
          and function values during search and cumulative runtimes per iteration
         """
-
+        # Initialise search
         current_soln = self.random_soln_generator()
         current_fval = self.objective_func(500*current_soln)
         best_soln = current_soln
         best_fval = current_fval
         temperature = self.initial_temperature_search(0.8)
-        # print('initial temperature', temperature)
         solns = []
         fvals = []
         accepted_fvals_at_current_temp = []
@@ -217,11 +209,13 @@ class Annealer:
         for i in range(self.allowed_evals - self.initial_temperature_search_evals - 1):
             # need -1 here because doing 1 function evaluation outside the loop
 
+            # Generate new solution
             if self.adaptive_solns:
                 new_soln, u = self.adaptive_soln_generator(current_soln)
             else:
                 new_soln = self.soln_generator(current_soln)
 
+            # Assess solution
             new_fval = self.objective_func(500*new_soln)
             accept_prob = self.acceptance_probability(current_fval, new_fval, current_soln,
                                                           new_soln, temperature)
@@ -235,6 +229,7 @@ class Annealer:
                 solns.append(500*current_soln)  # Update history of all ACCEPTED solutions
                 accepted_fvals_at_current_temp.append(current_fval)
 
+                # Save if best solution
                 if current_fval < best_fval:
                     best_soln = current_soln.copy()
                     best_fval = current_fval
@@ -260,11 +255,3 @@ class Annealer:
                 accepted_fvals_at_current_temp = []
 
         return 500*best_soln, best_fval, solns, fvals, iter_times
-
-
-
-
-
-
-
-

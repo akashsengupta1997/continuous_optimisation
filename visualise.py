@@ -62,7 +62,8 @@ def search_pattern_contour_plot(objective_func, solns):
 
 def fvals_iters_plot(fvals):
     plt.plot(fvals)
-    plt.xlabel('Iteration')
+    # plt.xlabel('Iteration')
+    plt.xlabel('Number of evaluations')
     plt.ylabel('Objective value')
     plt.show()
 
@@ -80,6 +81,9 @@ def evolution_strat_fvals_generations_plot(fvals_history):
     min_fvals = [min(fvals) for fvals in fvals_history]
     plt.plot(avg_fvals)
     plt.plot(min_fvals)
+    plt.legend(('Average objective value', 'Minimum objective value'))
+    plt.xlabel('Generation')
+    plt.ylabel('Objective value')
     plt.show()
 
 
@@ -87,8 +91,12 @@ def evolution_strat_fvals_evaluations_plot(fvals_history, num_evals_per_generati
     evals = np.arange(len(fvals_history)) * num_evals_per_generation
     avg_fvals = [np.mean(fvals) for fvals in fvals_history]
     min_fvals = [min(fvals) for fvals in fvals_history]
-    plt.plot(evals, avg_fvals)
+    print(len(min_fvals))
+    # plt.plot(evals, avg_fvals)
     plt.plot(evals, min_fvals)
+    # plt.legend(('Average objective value', 'Minimum objective value'))
+    plt.xlabel('Number of evaluations')
+    plt.ylabel('Objective value')
     plt.show()
 
 
