@@ -2,7 +2,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
-from objective import schwefel_func
+from objective_funcs import schwefel_func
 
 # TODO LABELS
 

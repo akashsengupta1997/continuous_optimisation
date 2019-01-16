@@ -1,7 +1,7 @@
 import numpy as np
-from annealer import Annealer
+from simulated_annealing import Annealer
 from evolution_strategy import EvolutionStrategy
-from objective import schwefel_func
+from objective_funcs import schwefel_func
 
 
 def optimiser_test(optimiser):

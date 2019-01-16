@@ -1,2 +1,14 @@
-4M17 Coursework 2: 
-Find global minimum of 5D Schwefel's function using simulated annealing and a genetic algorithm + compare performance.
+Suite of continuous optimisation algorithms.
+
+Currently contains:
+- Simulated Annealing
+- Evolutionary Strategy
+
+Current benchmark functions:
+- Schwefel's function
+
+
+TODO:
+- Genetic algorithm
+- Tabu search
+- More benchmark functions?
